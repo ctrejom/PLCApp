@@ -87,7 +87,7 @@ class _CasilleroTablePageState extends State<CasilleroTablePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Página de Warehouses'),
+        title: const Text('Página de Casilleros'),
       ),
       drawer: CustomSideBar(
         selectedIndex: 1,
