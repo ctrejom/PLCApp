@@ -12,9 +12,10 @@ dependencies:
   faker: ^2.0.0
   data_table_2: ^2.5.18
   sidebarx: ^0.17.1
+  printing: ^5.11.3
+  pdf: ^3.11.3
   flutter:
     sdk: flutter
-    
 
 dev_dependencies:
   flutter_test:
@@ -23,3 +24,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/Roboto-Regular.ttf
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf

@@ -1,13 +1,25 @@
-import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:data_table_2/data_table_2.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'main.dart';
 import 'CustomWidgets/CustomSideBar.dart';
 import 'package:sidebarx/sidebarx.dart';
 
 void main() {
   runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Warehouse Table to PDF',
+      home: WarehouseTablePage(),
+    );
+  }
 }
 
 class WarehouseTablePage extends StatefulWidget {
@@ -21,13 +33,19 @@ class _WarehouseTablePageState extends State<WarehouseTablePage> {
   final TextEditingController _searchController = TextEditingController();
   final SidebarXController _sidebarXController = SidebarXController(selectedIndex: 1);
 
-    // Variable de estado para el número de filas por página.
+  // Variables para la paginación
   int _rowsPerPage = 10;
+  int currentPage = 0; // Número de página (0, 1, 2, ...)
+
+  @override
+  void initState() {
+    super.initState();
+    fetchWarehouses();
+    _searchController.addListener(_filterWarehouses);
+  }
 
   Future<void> fetchWarehouses() async {
-    final response =
-        await http.get(Uri.parse('http://localhost:3000/warehouses'));
-
+    final response = await http.get(Uri.parse('http://localhost:3000/warehouses'));
     if (response.statusCode == 200) {
       setState(() {
         warehouses = json.decode(response.body).map((warehouse) {
@@ -56,40 +74,157 @@ class _WarehouseTablePageState extends State<WarehouseTablePage> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       filteredWarehouses = warehouses.where((warehouse) {
-        return warehouse['warehouseID'].toLowerCase().contains(query) ||
-            warehouse['destinatario'].toLowerCase().contains(query) ||
-            warehouse['destino'].toLowerCase().contains(query) ||
-            warehouse['fecha'].toLowerCase().contains(query) ||
-            warehouse['estatus'].toLowerCase().contains(query) ||
-            warehouse['modalidad'].toLowerCase().contains(query) ||
-            warehouse['cargaID'].toLowerCase().contains(query);
+        return (warehouse['warehouseID'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['destinatario'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['destino'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['fecha'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['estatus'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['modalidad'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query) ||
+            (warehouse['cargaID'] ?? '')
+                .toString()
+                .toLowerCase()
+                .contains(query);
       }).toList();
+      // Reinicia a la primera página al filtrar
+      currentPage = 0;
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    fetchWarehouses();
-    _searchController.addListener(_filterWarehouses);
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  // Método que retorna la fuente de datos para la PaginatedDataTable2
   WarehouseDataSource _warehouseDataSource() {
     return WarehouseDataSource(warehouses: filteredWarehouses);
+  }
+
+  Future<void> _generatePdf() async {
+    // Calcula el índice de inicio y fin según la página actual y el número de filas por página
+    int start = currentPage * _rowsPerPage;
+    int end = (start + _rowsPerPage) > filteredWarehouses.length
+        ? filteredWarehouses.length
+        : start + _rowsPerPage;
+    List<dynamic> visibleWarehouses = filteredWarehouses.sublist(start, end);
+
+    final pdfDoc = pw.Document();
+
+    final headers = [
+      'WarehouseID',
+      'Destinatario',
+      'Destino',
+      'Fecha',
+      'Piezas',
+      'Peso',
+      'Estatus',
+      'Modalidad',
+      'CargaID'
+    ];
+
+    // Mapea los datos visibles en una lista de filas
+    final data = visibleWarehouses.map((warehouse) {
+      return [
+        warehouse['warehouseID'].toString(),
+        warehouse['destinatario'],
+        warehouse['destino'],
+        warehouse['fecha'].toString(),
+        warehouse['piezas'].toString(),
+        warehouse['peso'].toString(),
+        warehouse['estatus'].toString(),
+        warehouse['modalidad'],
+        warehouse['cargaID'].toString(),
+      ];
+    }).toList();
+
+    pdfDoc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a3,
+        margin: pw.EdgeInsets.all(16),
+        build: (pw.Context context) {
+          return [
+            // Encabezado del reporte
+            pw.Text(
+              "Reporte de warehouses",
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 10),
+            // Tabla personalizada con anchos fijos para que el texto haga wrap
+            pw.Table(
+              columnWidths: {
+                0: const pw.FixedColumnWidth(60),  // WarehouseID
+                1: const pw.FixedColumnWidth(80),  // Destinatario
+                2: const pw.FixedColumnWidth(80),  // Destino
+                3: const pw.FixedColumnWidth(60),  // Fecha
+                4: const pw.FixedColumnWidth(40),  // Piezas
+                5: const pw.FixedColumnWidth(40),  // Peso
+                6: const pw.FixedColumnWidth(60),  // Estatus
+                7: const pw.FixedColumnWidth(60),  // Modalidad
+                8: const pw.FixedColumnWidth(60),  // CargaID
+              },
+              border: pw.TableBorder.all(color: PdfColors.grey),
+              children: [
+                // Fila de encabezados
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.blue),
+                  children: headers.map((header) => pw.Container(
+                    padding: pw.EdgeInsets.all(5),
+                    child: pw.Text(
+                      header,
+                      style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+                      softWrap: true,
+                    ),
+                  )).toList(),
+                ),
+                // Filas de datos
+                ...data.map((row) {
+                  return pw.TableRow(
+                    children: row.map((cell) => pw.Container(
+                      padding: pw.EdgeInsets.all(5),
+                      child: pw.Text(
+                        cell.toString(),
+                        style: pw.TextStyle(fontSize: 8),
+                        softWrap: true,
+                      ),
+                    )).toList(),
+                  );
+                }).toList(),
+              ],
+            )
+          ];
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdfDoc.save(),
+      name: 'Reporte_de_Warehouses.pdf',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Página de Warehouses'),
+        title: Text('Página de Warehouses'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.picture_as_pdf),
+            onPressed: _generatePdf,
+          ),
+        ],
       ),
       drawer: CustomSideBar(
         selectedIndex: 1,
@@ -101,7 +236,7 @@ class _WarehouseTablePageState extends State<WarehouseTablePage> {
           children: [
             TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Buscar',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.all(Radius.circular(10)),
@@ -109,12 +244,11 @@ class _WarehouseTablePageState extends State<WarehouseTablePage> {
                 prefixIcon: Icon(Icons.search),
                 filled: true,
               ),
-              onChanged: (value) => _filterWarehouses(),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
             Expanded(
               child: PaginatedDataTable2(
-                header: const Text('Listado de Warehouses'),
+                header: Text('Listado de Warehouses'),
                 columnSpacing: 12,
                 horizontalMargin: 12,
                 minWidth: 600,
@@ -160,12 +294,18 @@ class _WarehouseTablePageState extends State<WarehouseTablePage> {
                 ],
                 source: _warehouseDataSource(),
                 rowsPerPage: _rowsPerPage,
-                availableRowsPerPage: const<int>[10,20,50],
+                availableRowsPerPage: const [10, 20, 50],
                 onRowsPerPageChanged: (value) {
                   setState(() {
                     _rowsPerPage = value!;
                   });
-                },// Puedes ajustar la cantidad de filas por página
+                },
+                // Convertimos el índice recibido a número de página real
+                onPageChanged: (firstRowIndex) {
+                  setState(() {
+                    currentPage = (firstRowIndex / _rowsPerPage).floor();
+                  });
+                },
               ),
             ),
           ],
@@ -186,12 +326,14 @@ class WarehouseDataSource extends DataTableSource {
     final warehouse = warehouses[index];
     return DataRow2(
       cells: [
-        DataCell(ActionChip(
-          label: Text(warehouse['warehouseID'].toString()),
-          onPressed: () {
-            print('ID del paquete: ${warehouse['warehouseID']}');
-          },
-        )),
+        DataCell(
+          ActionChip(
+            label: Text(warehouse['warehouseID'].toString()),
+            onPressed: () {
+              print('ID del paquete: ${warehouse['warehouseID']}');
+            },
+          ),
+        ),
         DataCell(Text(warehouse['destinatario'])),
         DataCell(Text(warehouse['destino'])),
         DataCell(Text(warehouse['fecha'].toString())),
@@ -206,10 +348,8 @@ class WarehouseDataSource extends DataTableSource {
 
   @override
   bool get isRowCountApproximate => false;
-
   @override
   int get rowCount => warehouses.length;
-
   @override
   int get selectedRowCount => 0;
 }

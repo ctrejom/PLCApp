@@ -1,13 +1,25 @@
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw; // Importa el paquete pdf
+import 'package:printing/printing.dart'; // Importa el paquete printing para la vista previa e impresión del PDF
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'main.dart';
 import 'CustomWidgets/CustomSideBar.dart';
 import 'package:sidebarx/sidebarx.dart';
 
 void main() {
   runApp(MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Packages Table to PDF',
+      home: PackagesTablePage(),
+    );
+  }
 }
 
 class PackagesTablePage extends StatefulWidget {
@@ -19,16 +31,22 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
   dynamic packages = [];
   List<dynamic> filteredPackages = [];
   final TextEditingController _searchController = TextEditingController();
-  final SidebarXController _sidebarXController =
-      SidebarXController(selectedIndex: 2);
+  final SidebarXController _sidebarXController = SidebarXController(selectedIndex: 2);
 
-  // Variable de estado para el número de filas por página.
+  // Variables para la paginación
   int _rowsPerPage = 10;
+  int currentPage = 0; // Para rastrear la página actual mostrada
 
+  @override
+  void initState() {
+    super.initState();
+    fetchPackages();
+    _searchController.addListener(_filterPackages);
+  }
+
+  // Función para obtener los paquetes desde la API
   Future<void> fetchPackages() async {
-    final response =
-        await http.get(Uri.parse('http://localhost:3000/paquetes'));
-
+    final response = await http.get(Uri.parse('http://localhost:3000/paquetes'));
     if (response.statusCode == 200) {
       setState(() {
         packages = json.decode(response.body).map((package) {
@@ -55,15 +73,13 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
     }
   }
 
+  // Función para filtrar los paquetes según el texto ingresado
   void _filterPackages() {
     final query = _searchController.text.toLowerCase();
     setState(() {
       filteredPackages = packages.where((package) {
         return package['paqueteID'].toLowerCase().contains(query) ||
-            package['warehouseID']
-                .toString()
-                .toLowerCase()
-                .contains(query) ||
+            package['warehouseID'].toString().toLowerCase().contains(query) ||
             package['destinatario'].toLowerCase().contains(query) ||
             package['destino'].toLowerCase().contains(query) ||
             package['fecha'].toLowerCase().contains(query) ||
@@ -77,11 +93,90 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    fetchPackages();
-    _searchController.addListener(_filterPackages);
+  // Fuente de datos para la tabla
+  PackagesDataSource _packagesDataSource() {
+    return PackagesDataSource(packages: filteredPackages);
+  }
+
+  // Función para generar el PDF solo con los datos que se muestran en la página actual
+  Future<void> _generatePdf() async {
+    // Calcula el índice de inicio y fin según la página actual y el número de filas por página
+    int start = currentPage * _rowsPerPage;
+    int end = (start + _rowsPerPage) > filteredPackages.length
+        ? filteredPackages.length
+        : start + _rowsPerPage;
+    List<dynamic> visiblePackages = filteredPackages.sublist(start, end);
+
+    final pdfDoc = pw.Document();
+
+    // Definición de los encabezados de la tabla en el PDF
+    final headers = [
+      'Paquete ID',
+      'Warehouse ID',
+      'Destinatario',
+      'Destino',
+      'Fecha',
+      'Tracking',
+      'Peso',
+      'Tipo',
+      'Modalidad',
+      'Estatus'
+    ];
+
+    // Mapea los datos visibles en una lista de filas para la tabla
+    final data = visiblePackages.map((package) {
+      return [
+        package['paqueteID'].toString(),
+        package['warehouseID'].toString(),
+        package['destinatario'],
+        package['destino'],
+        package['fecha'].toString(),
+        package['tracking'].toString(),
+        package['peso'].toString(),
+        package['tipo'].toString(),
+        package['modalidad'].toString(),
+        package['estatus'].toString(),
+      ];
+    }).toList();
+
+    // Agrega una página multipágina para que el contenido se divida si es extenso
+    pdfDoc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a3,
+        margin: pw.EdgeInsets.all(16),
+        build: (pw.Context context) {
+          return [
+            // Título del reporte
+            pw.Text(
+              "Reporte de packages",
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 10),
+            // Creación de la tabla con formato personalizado
+            pw.Table.fromTextArray(
+              headers: headers,
+              data: data,
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: pw.BoxDecoration(
+                color: PdfColors.blue,
+              ),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellStyle: pw.TextStyle(fontSize: 8),
+              cellPadding: pw.EdgeInsets.all(5),
+              border: pw.TableBorder.all(color: PdfColors.grey),
+            )
+          ];
+        },
+      ),
+    );
+
+    // Muestra la vista previa del PDF para imprimir o guardar
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdfDoc.save(),
+    );
   }
 
   @override
@@ -90,15 +185,18 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
     super.dispose();
   }
 
-  PackagesDataSource _packagesDataSource() {
-    return PackagesDataSource(packages: filteredPackages);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Página de Paquetes'),
+        actions: [
+          // Botón en el AppBar para generar el PDF
+          IconButton(
+            icon: Icon(Icons.picture_as_pdf),
+            onPressed: _generatePdf,
+          ),
+        ],
       ),
       drawer: CustomSideBar(
         selectedIndex: 2,
@@ -106,9 +204,9 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        // Si es posible, prueba a quitar el Padding para verificar que no esté afectando el layout
         child: Column(
           children: [
+            // Campo de búsqueda para filtrar los paquetes
             TextField(
               controller: _searchController,
               decoration: const InputDecoration(
@@ -122,6 +220,7 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
               onChanged: (value) => _filterPackages(),
             ),
             const SizedBox(height: 20),
+            // Tabla paginada que muestra los paquetes
             Expanded(
               child: PaginatedDataTable2(
                 header: const Text('Listado de Paquetes'),
@@ -144,23 +243,31 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
                 ],
                 source: _packagesDataSource(),
                 rowsPerPage: _rowsPerPage,
-                availableRowsPerPage: const <int>[10, 20, 50],
+                availableRowsPerPage: const [10, 20, 50],
                 onRowsPerPageChanged: (value) {
                   setState(() {
                     _rowsPerPage = value!;
                   });
                 },
-                // Puedes activar los botones de primera/última página para mayor control:
+                // Actualiza la página actual cuando se navega entre páginas
+                onPageChanged: (firstRowIndex) {
+                  setState(() {
+                    currentPage = (firstRowIndex / _rowsPerPage).floor();
+                  });
+                  
+                },
                 showFirstLastButtons: true,
               ),
             ),
           ],
         ),
       ),
+      // Botón flotante alternativo para generar el PDF
     );
   }
 }
 
+// Clase que define la fuente de datos para la tabla paginada
 class PackagesDataSource extends DataTableSource {
   final List<dynamic> packages;
 
@@ -172,12 +279,14 @@ class PackagesDataSource extends DataTableSource {
     final package = packages[index];
     return DataRow2(
       cells: [
-        DataCell(ActionChip(
-          label: Text(package['paqueteID'].toString()),
-          onPressed: () {
-            print('ID del paquete: ${package['paqueteID']}');
-          },
-        )),
+        DataCell(
+          ActionChip(
+            label: Text(package['paqueteID'].toString()),
+            onPressed: () {
+              print('ID del paquete: ${package['paqueteID']}');
+            },
+          ),
+        ),
         DataCell(Text(package['warehouseID'].toString())),
         DataCell(Text(package['destinatario'])),
         DataCell(Text(package['destino'])),
@@ -193,10 +302,8 @@ class PackagesDataSource extends DataTableSource {
 
   @override
   bool get isRowCountApproximate => false;
-
   @override
   int get rowCount => packages.length;
-
   @override
   int get selectedRowCount => 0;
 }

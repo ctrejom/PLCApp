@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:plcapp/PackagesTablePage.dart';
 import 'HomePage.dart';
 import 'WarehouseTablePage.dart';
-import 'CasilleroTablePage.dart';
+import 'ClientTablePage.dart';
 
 void main() {
   runApp(MyApp());
@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
         '/': (context) => HomePage(),
         'WarehouseTablePage': (context) => WarehouseTablePage(),
         'PackagesTablePage': (context) => PackagesTablePage(),
-        'CasilleroTablePage': (context) => CasilleroTablePage(),
+        'CasilleroTablePage': (context) => ClientTablePage(),
       },
     );
   }

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:plcapp/CasilleroTablePage.dart';
+import 'package:plcapp/ClientTablePage.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../HomePage.dart';
 import '../WarehouseTablePage.dart'; // Define o crea una página para "Paquetes"
@@ -112,7 +112,7 @@ class CustomSideBar extends StatelessWidget {
             label: 'Casilleros',
             onTap: (){
               debugPrint('Casilleros tapped');
-              Navigator.push(context, MaterialPageRoute(builder: (context) => CasilleroTablePage()));
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ClientTablePage()));
             }
           )
         ],
