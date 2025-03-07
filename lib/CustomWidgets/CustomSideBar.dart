@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:plcapp/ChargeTablePage.dart';
 import 'package:plcapp/ClientTablePage.dart';
 import 'package:sidebarx/sidebarx.dart';
 import '../HomePage.dart';
@@ -113,6 +114,14 @@ class CustomSideBar extends StatelessWidget {
             onTap: (){
               debugPrint('Casilleros tapped');
               Navigator.push(context, MaterialPageRoute(builder: (context) => ClientTablePage()));
+            }
+          ),
+          SidebarXItem(
+            icon: Icons.flight_land_outlined,
+            label: 'Cargas',
+            onTap: (){
+              debugPrint('Cargas Tapped');
+              Navigator.push(context, MaterialPageRoute(builder: (context) => ChargeTablePage()));
             }
           )
         ],

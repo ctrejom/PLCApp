@@ -3,7 +3,7 @@ import 'package:plcapp/PackagesTablePage.dart';
 import 'HomePage.dart';
 import 'WarehouseTablePage.dart';
 import 'ClientTablePage.dart';
-
+import 'ChargeTablePage.dart';
 void main() {
   runApp(MyApp());
 }
@@ -20,6 +20,7 @@ class MyApp extends StatelessWidget {
         'WarehouseTablePage': (context) => WarehouseTablePage(),
         'PackagesTablePage': (context) => PackagesTablePage(),
         'CasilleroTablePage': (context) => ClientTablePage(),
+        'ChargeTablePage': (context) => ChargeTablePage(),
       },
     );
   }

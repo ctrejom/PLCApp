@@ -109,7 +109,7 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
 
     final pdfDoc = pw.Document();
 
-    // Definición de los encabezados de la tabla en el PDF
+    // Encabezados de la tabla en el PDF
     final headers = [
       'Paquete ID',
       'Warehouse ID',
@@ -139,7 +139,6 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
       ];
     }).toList();
 
-    // Agrega una página multipágina para que el contenido se divida si es extenso
     pdfDoc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a3,
@@ -152,21 +151,48 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
             pw.SizedBox(height: 10),
-            // Creación de la tabla con formato personalizado
-            pw.Table.fromTextArray(
-              headers: headers,
-              data: data,
-              headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold,
-                color: PdfColors.white,
-              ),
-              headerDecoration: pw.BoxDecoration(
-                color: PdfColors.blue,
-              ),
-              cellAlignment: pw.Alignment.centerLeft,
-              cellStyle: pw.TextStyle(fontSize: 8),
-              cellPadding: pw.EdgeInsets.all(5),
+            // Tabla personalizada con anchos fijos para que el texto haga wrap
+            pw.Table(
+              columnWidths: {
+                0: pw.FixedColumnWidth(60),  // Paquete ID
+                1: pw.FixedColumnWidth(60),  // Warehouse ID
+                2: pw.FixedColumnWidth(80),  // Destinatario
+                3: pw.FixedColumnWidth(80),  // Destino
+                4: pw.FixedColumnWidth(60),  // Fecha
+                5: pw.FixedColumnWidth(80),  // Tracking
+                6: pw.FixedColumnWidth(40),  // Peso
+                7: pw.FixedColumnWidth(40),  // Tipo
+                8: pw.FixedColumnWidth(60),  // Modalidad
+                9: pw.FixedColumnWidth(60),  // Estatus
+              },
               border: pw.TableBorder.all(color: PdfColors.grey),
+              children: [
+                // Fila de encabezados
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: PdfColors.blue),
+                  children: headers.map((header) => pw.Container(
+                    padding: pw.EdgeInsets.all(5),
+                    child: pw.Text(
+                      header,
+                      style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
+                      softWrap: true,
+                    ),
+                  )).toList(),
+                ),
+                // Filas de datos
+                ...data.map((row) {
+                  return pw.TableRow(
+                    children: row.map((cell) => pw.Container(
+                      padding: pw.EdgeInsets.all(5),
+                      child: pw.Text(
+                        cell.toString(),
+                        style: pw.TextStyle(fontSize: 8),
+                        softWrap: true,
+                      ),
+                    )).toList(),
+                  );
+                }).toList(),
+              ],
             )
           ];
         },
@@ -254,7 +280,6 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
                   setState(() {
                     currentPage = (firstRowIndex / _rowsPerPage).floor();
                   });
-                  
                 },
                 showFirstLastButtons: true,
               ),
@@ -262,7 +287,6 @@ class _PackagesTablePageState extends State<PackagesTablePage> {
           ],
         ),
       ),
-      // Botón flotante alternativo para generar el PDF
     );
   }
 }
@@ -279,14 +303,12 @@ class PackagesDataSource extends DataTableSource {
     final package = packages[index];
     return DataRow2(
       cells: [
-        DataCell(
-          ActionChip(
-            label: Text(package['paqueteID'].toString()),
-            onPressed: () {
-              print('ID del paquete: ${package['paqueteID']}');
-            },
-          ),
-        ),
+        DataCell(ActionChip(
+          label: Text(package['paqueteID'].toString()),
+          onPressed: () {
+            print('ID del paquete: ${package['paqueteID']}');
+          },
+        )),
         DataCell(Text(package['warehouseID'].toString())),
         DataCell(Text(package['destinatario'])),
         DataCell(Text(package['destino'])),
